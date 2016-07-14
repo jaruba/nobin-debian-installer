@@ -26,7 +26,7 @@ Deb.prototype.pack = function (definition, files, callback) {
 
   async.series([
     fs.mkdir.bind(fs, tempPath),
-    packFiles.bind(this, tempPath, expandFiles(files)),
+    packFiles.bind(this, tempPath, expandFiles(files, definition.info.from)),
     buildControlFile.bind(this, tempPath, definition),
     function buildDebBinFile (done) {
       fs.writeFile(path.join(tempPath, 'debian-binary'), '2.0\n', done)
@@ -90,13 +90,12 @@ function buildControlFile (tempPath, definition, callback) {
   }
 
   // optional items
-  if (definition.package.homepage) {
-    self.controlFile.Homepage = definition.package.homepage
+  if (definition.package.website) {
+    self.controlFile.Homepage = definition.package.website
   }
 
-  self.controlFile.Description = definition.package.description + '\n ' +
-    (definition.info.name || definition.package.name) +
-    ': ' + definition.package.description
+  self.controlFile.Description = definition.info.short_desc + '\n ' +
+    definition.info.description
 
   // create the control file
   async.parallel([
@@ -123,7 +122,6 @@ function buildControlFile (tempPath, definition, callback) {
       async.forEachOf(definition.info.scripts, function (path, scriptName, doneScript) {
         debug('processing script ', path)
         async.waterfall([
-          fs.access.bind(fs, path, fs.F_OK),
           fs.stat.bind(fs, path),
           function readFile (stats, wtfDone) {
             fs.readFile(path, function (err, data) {
@@ -243,7 +241,7 @@ function addParentDirs (tarball, dir, createdDirs, callback) {
   }
 }
 
-function expandFiles (files) {
+function expandFiles (files, from) {
   var expand = require('glob-expand')
   var expandedFiles = []
   files.map(function (file) {
@@ -251,7 +249,7 @@ function expandFiles (files) {
     sources.map(function (source) {
       expandedFiles.push({
         src: [path.join((file.cwd ? file.cwd : ''), source)],
-        dest: path.join(file.dest, source)
+        dest: path.join(file.dest, source).split('\\').join('/').replace('/' + from, '')
       })
     })
   })
